@@ -92,14 +92,9 @@ public class ReservationService {
                                 new IllegalArgumentException(
                                         "Customer not found with id: "
                                                 + dto.getCustomerId()));
-        
-        if (dto.getCreatedAt() == null) {
-            throw new IllegalArgumentException("CreatedAt cannot be null");
-        }
 
         existingReservation.setCustomer(customer);
         existingReservation.setDescription(dto.getDescription());
-        existingReservation.setCreatedAt(dto.getCreatedAt());
         existingReservation.setPickupAt(dto.getPickupAt());
         existingReservation.setTotal(dto.getTotal());
         existingReservation.setPending(dto.getPending());
