@@ -5,9 +5,13 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.delicious_cake.delicious_cake_app.enums.SaleStatus;
+
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
@@ -33,6 +37,10 @@ public class SaleEntity extends BaseEntity {
 
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal total;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private SaleStatus status;
 
     @OneToMany(
         mappedBy = "sale",

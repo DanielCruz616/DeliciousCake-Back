@@ -6,6 +6,7 @@ import com.delicious_cake.delicious_cake_app.dtos.SaleDTO;
 public class SaleMapper {
 
     public static SaleDTO toDTO(SaleEntity entity) {
+
         if (entity == null) {
             return null;
         }
@@ -15,6 +16,7 @@ public class SaleMapper {
         dto.setId(entity.getId());
         dto.setCreatedAt(entity.getCreatedAt());
         dto.setTotal(entity.getTotal());
+        dto.setStatus(entity.getStatus());
 
         if (entity.getCustomer() != null) {
             dto.setCustomerId(entity.getCustomer().getId());
@@ -24,10 +26,19 @@ public class SaleMapper {
             dto.setTableId(entity.getTable().getId());
         }
 
+        if (entity.getDetails() != null) {
+            dto.setDetails(
+                    entity.getDetails()
+                            .stream()
+                            .map(SaleDetailMapper::toDTO)
+                            .toList());
+        }
+
         return dto;
     }
 
     public static SaleEntity toEntity(SaleDTO dto) {
+
         if (dto == null) {
             return null;
         }
@@ -36,6 +47,7 @@ public class SaleMapper {
 
         entity.setCreatedAt(dto.getCreatedAt());
         entity.setTotal(dto.getTotal());
+        entity.setStatus(dto.getStatus());
 
         return entity;
     }

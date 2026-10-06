@@ -5,11 +5,13 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.delicious_cake.delicious_cake_app.dtos.SaleDetailDTO;
 import com.delicious_cake.delicious_cake_app.entities.ProductEntity;
 import com.delicious_cake.delicious_cake_app.entities.SaleDetailEntity;
 import com.delicious_cake.delicious_cake_app.entities.SaleEntity;
+import com.delicious_cake.delicious_cake_app.enums.SaleStatus;
 import com.delicious_cake.delicious_cake_app.mappers.SaleDetailMapper;
 import com.delicious_cake.delicious_cake_app.repositories.ProductRepository;
 import com.delicious_cake.delicious_cake_app.repositories.SaleDetailRepository;
@@ -33,31 +35,35 @@ public class SaleDetailService {
     }
 
     //Create Method
+    @Transactional
     public SaleDetailDTO create(SaleDetailDTO dto) {
 
         validateSaleDetail(dto);
 
+        SaleEntity sale = saleRepository.findById(dto.getSaleId())
+                .orElseThrow(() ->
+                        new IllegalArgumentException(
+                                "Sale not found with id: " + dto.getSaleId()));
+
+        validateSaleIsOpen(sale);
+
         SaleDetailEntity saleDetail = SaleDetailMapper.toEntity(dto);
 
-        SaleEntity sale = saleRepository.findById(dto.getSaleId())
-                .orElseThrow(() -> new IllegalArgumentException("Sale not found with id: " + dto.getSaleId()));
-
-        ProductEntity product = productRepository.findById(dto.getProductId())
-                .orElseThrow(() -> new IllegalArgumentException("Product not found with id: " + dto.getProductId()));
+        ProductEntity product = productRepository.findById(dto.getProductId()).orElseThrow(() ->
+                new IllegalArgumentException("Product not found with id: " + dto.getProductId()));
 
         BigDecimal unitPrice = product.getPrice();
 
-        BigDecimal subtotal = unitPrice.multiply(
-                BigDecimal.valueOf(dto.getQuantity())
-        );
+        BigDecimal subtotal = unitPrice.multiply(BigDecimal.valueOf(dto.getQuantity()));
 
         saleDetail.setSale(sale);
         saleDetail.setProduct(product);
         saleDetail.setUnitPrice(unitPrice);
         saleDetail.setSubtotal(subtotal);
 
-        SaleDetailEntity savedSaleDetail =
-                saleDetailRepository.save(saleDetail);
+        SaleDetailEntity savedSaleDetail = saleDetailRepository.save(saleDetail);
+
+        updateSaleTotal(sale);
 
         return SaleDetailMapper.toDTO(savedSaleDetail);
     }
@@ -83,10 +89,9 @@ public class SaleDetailService {
                 .collect(Collectors.toList());
     }
 
-    //Update Method
-    public SaleDetailDTO update(
-            Long id,
-            SaleDetailDTO dto) {
+    // Update Method
+    @Transactional
+    public SaleDetailDTO update(Long id, SaleDetailDTO dto) {
 
         SaleDetailEntity existingSaleDetail =
                 saleDetailRepository.findById(id)
@@ -96,30 +101,37 @@ public class SaleDetailService {
 
         validateSaleDetail(dto);
 
-        SaleEntity sale = saleRepository.findById(dto.getSaleId())
-                .orElseThrow(() -> new IllegalArgumentException("Sale not found with id: " + dto.getSaleId()));
+        SaleEntity sale = existingSaleDetail.getSale();
 
-        ProductEntity product = productRepository.findById(dto.getProductId())
-                .orElseThrow(() -> new IllegalArgumentException("Product not found with id: " + dto.getProductId()));
-         
+        validateSaleIsOpen(sale);
+
+        ProductEntity product =
+                productRepository.findById(dto.getProductId())
+                        .orElseThrow(() ->
+                                new IllegalArgumentException(
+                                        "Product not found with id: "
+                                                + dto.getProductId()));
+
         BigDecimal unitPrice = product.getPrice();
 
         BigDecimal subtotal = unitPrice.multiply(
                 BigDecimal.valueOf(dto.getQuantity())
         );
-        existingSaleDetail.setSale(sale);
+
         existingSaleDetail.setProduct(product);
         existingSaleDetail.setQuantity(dto.getQuantity());
         existingSaleDetail.setUnitPrice(unitPrice);
         existingSaleDetail.setSubtotal(subtotal);
 
-        SaleDetailEntity updatedSaleDetail =
-                saleDetailRepository.save(existingSaleDetail);
+        SaleDetailEntity updatedSaleDetail = saleDetailRepository.save(existingSaleDetail);
+
+        updateSaleTotal(sale);
 
         return SaleDetailMapper.toDTO(updatedSaleDetail);
     }
 
-    //Delete Method
+    // Delete Method
+    @Transactional
     public void delete(Long id) {
 
         SaleDetailEntity saleDetail =
@@ -128,10 +140,16 @@ public class SaleDetailService {
                                 new IllegalArgumentException(
                                         "Sale detail not found with id: " + id));
 
+        SaleEntity sale = saleDetail.getSale();
+
+        validateSaleIsOpen(sale);
+
         saleDetailRepository.delete(saleDetail);
+
+        updateSaleTotal(sale);
     }
 
-    //Validation Method
+    // Validation Method
     private void validateSaleDetail(SaleDetailDTO dto) {
 
         if (dto.getSaleId() == null) {
@@ -148,5 +166,28 @@ public class SaleDetailService {
             throw new IllegalArgumentException(
                     "Quantity must be greater than zero");
         }
+    }
+
+    private void validateSaleIsOpen(SaleEntity sale) {
+
+        if (sale.getStatus() != SaleStatus.OPEN) {
+            throw new IllegalStateException("Sale cannot be modified because its status is " + sale.getStatus());
+        }
+    }
+
+    private void updateSaleTotal(SaleEntity sale) {
+
+        BigDecimal total = saleDetailRepository
+                .findBySaleId(sale.getId())
+                .stream()
+                .map(SaleDetailEntity::getSubtotal)
+                .reduce(
+                        BigDecimal.ZERO,
+                        BigDecimal::add
+                );
+
+        sale.setTotal(total);
+
+        saleRepository.save(sale);
     }
 }

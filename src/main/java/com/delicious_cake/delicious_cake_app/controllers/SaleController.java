@@ -43,10 +43,4 @@ public class SaleController {
 
         return ResponseEntity.ok(saleService.update(id, saleDTO));
     }
-
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
-        saleService.delete(id);
-        return ResponseEntity.noContent().build();
-    }
 }
