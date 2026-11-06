@@ -36,6 +36,11 @@ public class SaleController {
         return ResponseEntity.ok(saleService.getAll());
     }
 
+    @GetMapping("/open")
+    public List<SaleDTO> getOpenSales() {
+        return saleService.getOpenSales();
+    }
+
     @PutMapping("/{id}")
     public ResponseEntity<SaleDTO> update(
             @PathVariable Long id,

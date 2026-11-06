@@ -39,15 +39,11 @@ public class SaleService {
         @Transactional
         public SaleDTO create(SaleDTO dto) {
 
-                validateSale(dto);
-
                 SaleEntity sale = new SaleEntity();
 
-                sale.setCustomer(
-                                findCustomerById(dto.getCustomerId()));
+                sale.setCustomer(dto.getCustomerId() == null ? null : findCustomerById(dto.getCustomerId()));
 
-                sale.setTable(
-                                findStandById(dto.getTableId()));
+                sale.setTable(dto.getTableId() == null ? null : findStandById(dto.getTableId()));
 
                 sale.setCreatedAt(LocalDate.now());
 
@@ -77,6 +73,14 @@ public class SaleService {
                                 .collect(Collectors.toList());
         }
 
+        // Get all open Sales
+        public List<SaleDTO> getOpenSales() {
+                return saleRepository.findByStatus(SaleStatus.OPEN)
+                                .stream()
+                                .map(SaleMapper::toDTO)
+                                .collect(Collectors.toList());
+        }
+
         // Update customer/table
         @Transactional
         public SaleDTO update(Long id, SaleDTO dto) {
@@ -84,7 +88,16 @@ public class SaleService {
                 SaleEntity existingSale = findSaleById(id);
 
                 validateSaleIsOpen(existingSale);
-                validateSale(dto);
+
+                if (dto.getCustomerId() == null) {
+                        throw new IllegalArgumentException(
+                                        "Customer ID cannot be null");
+                }
+
+                if (dto.getTableId() == null) {
+                        throw new IllegalArgumentException(
+                                        "Table ID cannot be null");
+                }
 
                 existingSale.setCustomer(
                                 findCustomerById(dto.getCustomerId()));
@@ -130,19 +143,6 @@ public class SaleService {
                 SaleEntity cancelledSale = saleRepository.save(sale);
 
                 return SaleMapper.toDTO(cancelledSale);
-        }
-
-        private void validateSale(SaleDTO dto) {
-
-                if (dto.getCustomerId() == null) {
-                        throw new IllegalArgumentException(
-                                        "Customer ID cannot be null");
-                }
-
-                if (dto.getTableId() == null) {
-                        throw new IllegalArgumentException(
-                                        "Table ID cannot be null");
-                }
         }
 
         public void validateSaleIsOpen(SaleEntity sale) {
