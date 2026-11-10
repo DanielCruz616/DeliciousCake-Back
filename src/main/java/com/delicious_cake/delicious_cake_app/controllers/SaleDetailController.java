@@ -18,38 +18,16 @@ public class SaleDetailController {
         this.saleDetailService = saleDetailService;
     }
 
-    // @PostMapping
-    // public ResponseEntity<SaleDetailDTO> create(
-    //         @RequestBody SaleDetailDTO saleDetailDTO) {
-
-    //     return ResponseEntity
-    //             .status(HttpStatus.CREATED)
-    //             .body(saleDetailService.create(saleDetailDTO));
-    // }
-
     @GetMapping("/{id}")
-    public ResponseEntity<SaleDetailDTO> getById(@PathVariable Long id) {
+    public ResponseEntity<SaleDetailDTO> getById(
+            @PathVariable Long id) {
+
         return ResponseEntity.ok(saleDetailService.getById(id));
     }
 
     @GetMapping
     public ResponseEntity<List<SaleDetailDTO>> getAll() {
+
         return ResponseEntity.ok(saleDetailService.getAll());
-    }
-
-    @PutMapping("/{id}")
-    public ResponseEntity<SaleDetailDTO> update(
-            @PathVariable Long id,
-            @RequestBody SaleDetailDTO saleDetailDTO) {
-
-        return ResponseEntity.ok(
-                saleDetailService.update(id, saleDetailDTO)
-        );
-    }
-
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
-        saleDetailService.delete(id);
-        return ResponseEntity.noContent().build();
     }
 }

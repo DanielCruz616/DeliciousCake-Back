@@ -3,12 +3,13 @@ package com.delicious_cake.delicious_cake_app.services;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.delicious_cake.delicious_cake_app.dtos.SaleDTO;
+import com.delicious_cake.delicious_cake_app.dtos.SaleDetailDTO;
+import com.delicious_cake.delicious_cake_app.dtos.SaleRequestDTO;
 import com.delicious_cake.delicious_cake_app.entities.CustomerEntity;
 import com.delicious_cake.delicious_cake_app.entities.SaleEntity;
 import com.delicious_cake.delicious_cake_app.entities.StandEntity;
@@ -24,39 +25,53 @@ public class SaleService {
         private final SaleRepository saleRepository;
         private final CustomerRepository customerRepository;
         private final StandRepository standRepository;
+        private final SaleDetailService saleDetailService;
 
         public SaleService(
                         SaleRepository saleRepository,
                         CustomerRepository customerRepository,
-                        StandRepository standRepository) {
+                        StandRepository standRepository,
+                        SaleDetailService saleDetailService) {
 
                 this.saleRepository = saleRepository;
                 this.customerRepository = customerRepository;
                 this.standRepository = standRepository;
+                this.saleDetailService = saleDetailService;
         }
 
-        // Create an empty OPEN sale
+        // Create sale
         @Transactional
-        public SaleDTO create(SaleDTO dto) {
+        public SaleDTO create(SaleRequestDTO dto) {
 
                 SaleEntity sale = new SaleEntity();
 
-                sale.setCustomer(dto.getCustomerId() == null ? null : findCustomerById(dto.getCustomerId()));
+                sale.setCustomer(
+                                dto.getCustomerId() == null
+                                                ? null
+                                                : findCustomerById(dto.getCustomerId()));
 
-                sale.setTable(dto.getTableId() == null ? null : findStandById(dto.getTableId()));
+                sale.setTable(
+                                dto.getTableId() == null
+                                                ? null
+                                                : findStandById(dto.getTableId()));
 
                 sale.setCreatedAt(LocalDate.now());
-
                 sale.setTotal(BigDecimal.ZERO);
-
                 sale.setStatus(SaleStatus.OPEN);
 
                 SaleEntity savedSale = saleRepository.save(sale);
 
-                return SaleMapper.toDTO(savedSale);
+                List<SaleDetailDTO> details = saleDetailService.replaceDetails(
+                                savedSale,
+                                dto.getDetails());
+
+                saleRepository.save(savedSale);
+
+                return SaleMapper.toDTO(savedSale, details);
         }
 
         // Get by ID
+        @Transactional(readOnly = true)
         public SaleDTO getById(Long id) {
 
                 SaleEntity sale = findSaleById(id);
@@ -65,49 +80,53 @@ public class SaleService {
         }
 
         // Get all
+        @Transactional(readOnly = true)
         public List<SaleDTO> getAll() {
 
                 return saleRepository.findAll()
                                 .stream()
                                 .map(SaleMapper::toDTO)
-                                .collect(Collectors.toList());
+                                .toList();
         }
 
-        // Get all open Sales
+        // Get all open sales
+        @Transactional(readOnly = true)
         public List<SaleDTO> getOpenSales() {
+
                 return saleRepository.findByStatus(SaleStatus.OPEN)
                                 .stream()
                                 .map(SaleMapper::toDTO)
-                                .collect(Collectors.toList());
+                                .toList();
         }
 
-        // Update customer/table
+        // Update sale and its details
         @Transactional
-        public SaleDTO update(Long id, SaleDTO dto) {
+        public SaleDTO update(Long id, SaleRequestDTO dto) {
 
                 SaleEntity existingSale = findSaleById(id);
 
                 validateSaleIsOpen(existingSale);
 
-                if (dto.getCustomerId() == null) {
-                        throw new IllegalArgumentException(
-                                        "Customer ID cannot be null");
-                }
+                existingSale.setCustomer(
+                                dto.getCustomerId() == null
+                                                ? null
+                                                : findCustomerById(dto.getCustomerId()));
 
                 if (dto.getTableId() == null) {
                         throw new IllegalArgumentException(
                                         "Table ID cannot be null");
                 }
 
-                existingSale.setCustomer(
-                                findCustomerById(dto.getCustomerId()));
-
                 existingSale.setTable(
                                 findStandById(dto.getTableId()));
 
+                List<SaleDetailDTO> details = saleDetailService.replaceDetails(
+                                existingSale,
+                                dto.getDetails());
+
                 SaleEntity updatedSale = saleRepository.save(existingSale);
 
-                return SaleMapper.toDTO(updatedSale);
+                return SaleMapper.toDTO(updatedSale, details);
         }
 
         // Pay sale
@@ -125,9 +144,7 @@ public class SaleService {
 
                 sale.setStatus(SaleStatus.PAID);
 
-                SaleEntity paidSale = saleRepository.save(sale);
-
-                return SaleMapper.toDTO(paidSale);
+                return SaleMapper.toDTO(saleRepository.save(sale));
         }
 
         // Cancel sale
@@ -140,12 +157,11 @@ public class SaleService {
 
                 sale.setStatus(SaleStatus.CANCELLED);
 
-                SaleEntity cancelledSale = saleRepository.save(sale);
-
-                return SaleMapper.toDTO(cancelledSale);
+                return SaleMapper.toDTO(saleRepository.save(sale));
         }
 
-        public void validateSaleIsOpen(SaleEntity sale) {
+        // Validation
+        private void validateSaleIsOpen(SaleEntity sale) {
 
                 if (sale.getStatus() != SaleStatus.OPEN) {
                         throw new IllegalStateException(
@@ -154,6 +170,7 @@ public class SaleService {
                 }
         }
 
+        // Find methods
         private SaleEntity findSaleById(Long id) {
 
                 return saleRepository.findById(id)
@@ -165,16 +182,13 @@ public class SaleService {
 
                 return customerRepository.findById(customerId)
                                 .orElseThrow(() -> new IllegalArgumentException(
-                                                "Customer not found with id: "
-                                                                + customerId));
+                                                "Customer not found with id: " + customerId));
         }
 
         private StandEntity findStandById(Long standId) {
 
                 return standRepository.findById(standId)
                                 .orElseThrow(() -> new IllegalArgumentException(
-                                                "Stand not found with id: "
-                                                                + standId));
+                                                "Stand not found with id: " + standId));
         }
-
 }

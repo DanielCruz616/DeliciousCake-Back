@@ -1,193 +1,116 @@
 package com.delicious_cake.delicious_cake_app.services;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.delicious_cake.delicious_cake_app.dtos.SaleDetailDTO;
+import com.delicious_cake.delicious_cake_app.dtos.SaleDetailRequestDTO;
 import com.delicious_cake.delicious_cake_app.entities.ProductEntity;
 import com.delicious_cake.delicious_cake_app.entities.SaleDetailEntity;
 import com.delicious_cake.delicious_cake_app.entities.SaleEntity;
-import com.delicious_cake.delicious_cake_app.enums.SaleStatus;
 import com.delicious_cake.delicious_cake_app.mappers.SaleDetailMapper;
 import com.delicious_cake.delicious_cake_app.repositories.ProductRepository;
 import com.delicious_cake.delicious_cake_app.repositories.SaleDetailRepository;
-import com.delicious_cake.delicious_cake_app.repositories.SaleRepository;
 
 @Service
 public class SaleDetailService {
 
     private final SaleDetailRepository saleDetailRepository;
-    private final SaleRepository saleRepository;
     private final ProductRepository productRepository;
 
     public SaleDetailService(
             SaleDetailRepository saleDetailRepository,
-            SaleRepository saleRepository,
             ProductRepository productRepository) {
 
         this.saleDetailRepository = saleDetailRepository;
-        this.saleRepository = saleRepository;
         this.productRepository = productRepository;
     }
 
-    //Create Method
+    // Replace all sale details
     @Transactional
-    public SaleDetailDTO create(SaleDetailDTO dto) {
+    public List<SaleDetailDTO> replaceDetails(
+            SaleEntity sale,
+            List<SaleDetailRequestDTO> details) {
 
-        validateSaleDetail(dto);
+        // 1. Remove existing details.
+        // orphanRemoval = true will delete them from the database.
+        sale.getDetails().clear();
 
-        SaleEntity sale = saleRepository.findById(dto.getSaleId())
-                .orElseThrow(() ->
-                        new IllegalArgumentException(
-                                "Sale not found with id: " + dto.getSaleId()));
+        BigDecimal total = BigDecimal.ZERO;
 
-        validateSaleIsOpen(sale);
+        List<SaleDetailEntity> newDetails = new ArrayList<>();
 
-        SaleDetailEntity saleDetail = SaleDetailMapper.toEntity(dto);
+        // 2. Create the new details.
+        for (SaleDetailRequestDTO detail : details) {
 
-        ProductEntity product = productRepository.findById(dto.getProductId()).orElseThrow(() ->
-                new IllegalArgumentException("Product not found with id: " + dto.getProductId()));
+            validateSaleDetail(detail);
 
-        BigDecimal unitPrice = product.getPrice();
+            ProductEntity product = productRepository.findById(
+                    detail.getProductId()).orElseThrow(() -> new IllegalArgumentException("Product not found"));
 
-        BigDecimal subtotal = unitPrice.multiply(BigDecimal.valueOf(dto.getQuantity()));
+            BigDecimal subtotal = product.getPrice().multiply(
+                    BigDecimal.valueOf(detail.getQuantity()));
 
-        saleDetail.setSale(sale);
-        saleDetail.setProduct(product);
-        saleDetail.setUnitPrice(unitPrice);
-        saleDetail.setSubtotal(subtotal);
+            SaleDetailEntity entity = new SaleDetailEntity();
 
-        SaleDetailEntity savedSaleDetail = saleDetailRepository.save(saleDetail);
+            entity.setSale(sale);
+            entity.setProduct(product);
+            entity.setQuantity(detail.getQuantity());
+            entity.setUnitPrice(product.getPrice());
+            entity.setSubtotal(subtotal);
 
-        updateSaleTotal(sale);
+            // Maintain the relationship on the SaleEntity side.
+            sale.getDetails().add(entity);
 
-        return SaleDetailMapper.toDTO(savedSaleDetail);
+            newDetails.add(entity);
+
+            total = total.add(subtotal);
+        }
+
+        // 3. Save the new details.
+        List<SaleDetailEntity> savedDetails = saleDetailRepository.saveAll(newDetails);
+
+        // 4. Update sale total.
+        sale.setTotal(total);
+
+        return savedDetails.stream()
+                .map(SaleDetailMapper::toDTO)
+                .toList();
     }
 
-    //Get Method
+    // Get by ID
     public SaleDetailDTO getById(Long id) {
 
-        SaleDetailEntity saleDetail =
-                saleDetailRepository.findById(id)
-                        .orElseThrow(() ->
-                                new IllegalArgumentException(
-                                        "Sale detail not found with id: " + id));
+        SaleDetailEntity detail = saleDetailRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Sale detail not found with id: " + id));
 
-        return SaleDetailMapper.toDTO(saleDetail);
+        return SaleDetailMapper.toDTO(detail);
     }
 
-    //Get All Method
+    // Get all
     public List<SaleDetailDTO> getAll() {
 
         return saleDetailRepository.findAll()
                 .stream()
                 .map(SaleDetailMapper::toDTO)
-                .collect(Collectors.toList());
+                .toList();
     }
 
-    // Update Method
-    @Transactional
-    public SaleDetailDTO update(Long id, SaleDetailDTO dto) {
-
-        SaleDetailEntity existingSaleDetail =
-                saleDetailRepository.findById(id)
-                        .orElseThrow(() ->
-                                new IllegalArgumentException(
-                                        "Sale detail not found with id: " + id));
-
-        validateSaleDetail(dto);
-
-        SaleEntity sale = existingSaleDetail.getSale();
-
-        validateSaleIsOpen(sale);
-
-        ProductEntity product =
-                productRepository.findById(dto.getProductId())
-                        .orElseThrow(() ->
-                                new IllegalArgumentException(
-                                        "Product not found with id: "
-                                                + dto.getProductId()));
-
-        BigDecimal unitPrice = product.getPrice();
-
-        BigDecimal subtotal = unitPrice.multiply(
-                BigDecimal.valueOf(dto.getQuantity())
-        );
-
-        existingSaleDetail.setProduct(product);
-        existingSaleDetail.setQuantity(dto.getQuantity());
-        existingSaleDetail.setUnitPrice(unitPrice);
-        existingSaleDetail.setSubtotal(subtotal);
-
-        SaleDetailEntity updatedSaleDetail = saleDetailRepository.save(existingSaleDetail);
-
-        updateSaleTotal(sale);
-
-        return SaleDetailMapper.toDTO(updatedSaleDetail);
-    }
-
-    // Delete Method
-    @Transactional
-    public void delete(Long id) {
-
-        SaleDetailEntity saleDetail =
-                saleDetailRepository.findById(id)
-                        .orElseThrow(() ->
-                                new IllegalArgumentException(
-                                        "Sale detail not found with id: " + id));
-
-        SaleEntity sale = saleDetail.getSale();
-
-        validateSaleIsOpen(sale);
-
-        saleDetailRepository.delete(saleDetail);
-
-        updateSaleTotal(sale);
-    }
-
-    // Validation Method
-    private void validateSaleDetail(SaleDetailDTO dto) {
-
-        if (dto.getSaleId() == null) {
-            throw new IllegalArgumentException(
-                    "Sale ID cannot be null");
-        }
+    // Validation
+    private void validateSaleDetail(SaleDetailRequestDTO dto) {
 
         if (dto.getProductId() == null) {
-            throw new IllegalArgumentException(
-                    "Product ID cannot be null");
+            throw new IllegalArgumentException("Product ID cannot be null");
         }
 
         if (dto.getQuantity() == null || dto.getQuantity() <= 0) {
             throw new IllegalArgumentException(
                     "Quantity must be greater than zero");
         }
-    }
-
-    private void validateSaleIsOpen(SaleEntity sale) {
-
-        if (sale.getStatus() != SaleStatus.OPEN) {
-            throw new IllegalStateException("Sale cannot be modified because its status is " + sale.getStatus());
-        }
-    }
-
-    private void updateSaleTotal(SaleEntity sale) {
-
-        BigDecimal total = saleDetailRepository
-                .findBySaleId(sale.getId())
-                .stream()
-                .map(SaleDetailEntity::getSubtotal)
-                .reduce(
-                        BigDecimal.ZERO,
-                        BigDecimal::add
-                );
-
-        sale.setTotal(total);
-
-        saleRepository.save(sale);
     }
 }

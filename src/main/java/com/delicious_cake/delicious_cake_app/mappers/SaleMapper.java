@@ -1,7 +1,11 @@
 package com.delicious_cake.delicious_cake_app.mappers;
 
 import com.delicious_cake.delicious_cake_app.entities.SaleEntity;
+
+import java.util.List;
+
 import com.delicious_cake.delicious_cake_app.dtos.SaleDTO;
+import com.delicious_cake.delicious_cake_app.dtos.SaleDetailDTO;
 
 public class SaleMapper {
 
@@ -32,6 +36,19 @@ public class SaleMapper {
                             .stream()
                             .map(SaleDetailMapper::toDTO)
                             .toList());
+        }
+
+        return dto;
+    }
+
+    public static SaleDTO toDTO(
+            SaleEntity entity,
+            List<SaleDetailDTO> details) {
+
+        SaleDTO dto = toDTO(entity);
+
+        if (dto != null) {
+            dto.setDetails(details);
         }
 
         return dto;
