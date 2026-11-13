@@ -2,6 +2,7 @@ package com.delicious_cake.delicious_cake_app.services;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
@@ -55,19 +56,13 @@ public class SaleService {
                                                 ? null
                                                 : findStandById(dto.getTableId()));
 
-                sale.setCreatedAt(LocalDate.now());
+                sale.setCreatedAt(LocalDate.now(ZoneId.of("America/Bogota")));
                 sale.setTotal(BigDecimal.ZERO);
                 sale.setStatus(SaleStatus.OPEN);
 
                 SaleEntity savedSale = saleRepository.save(sale);
 
-                List<SaleDetailDTO> details = saleDetailService.replaceDetails(
-                                savedSale,
-                                dto.getDetails());
-
-                saleRepository.save(savedSale);
-
-                return SaleMapper.toDTO(savedSale, details);
+                return SaleMapper.toDTO(savedSale);
         }
 
         // Get by ID

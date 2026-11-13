@@ -23,6 +23,7 @@ public class SaleDetailMapper {
 
         if (entity.getProduct() != null) {
             dto.setProductId(entity.getProduct().getId());
+            dto.setProductName(entity.getProduct().getName());
         }
 
         return dto;

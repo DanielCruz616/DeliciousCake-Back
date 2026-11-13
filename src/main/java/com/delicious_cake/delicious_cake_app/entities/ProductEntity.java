@@ -16,7 +16,7 @@ import lombok.Setter;
 
 @Entity
 @Getter
-@Setter 
+@Setter
 @Table(name = "products")
 public class ProductEntity extends BaseEntity {
 
@@ -28,6 +28,9 @@ public class ProductEntity extends BaseEntity {
 
     @Column(length = 500)
     private String description;
+
+    @Column(length = 500)
+    private String imageUrl;
 
     @ManyToOne
     @JoinColumn(name = "category_id", nullable = false)

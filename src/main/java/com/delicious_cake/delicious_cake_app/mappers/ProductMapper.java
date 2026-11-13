@@ -16,11 +16,11 @@ public class ProductMapper {
         dto.setName(entity.getName());
         dto.setPrice(entity.getPrice());
         dto.setDescription(entity.getDescription());
+        dto.setImageUrl(entity.getImageUrl());
 
         if (entity.getCategory() != null) {
             dto.setCategoryId(entity.getCategory().getId());
         }
-        
         return dto;
     }
 
@@ -34,6 +34,7 @@ public class ProductMapper {
         entity.setName(dto.getName());
         entity.setPrice(dto.getPrice());
         entity.setDescription(dto.getDescription());
+        entity.setImageUrl(entity.getImageUrl());
 
         return entity;
     }
